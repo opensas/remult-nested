@@ -1,0 +1,14 @@
+[
+	{
+		"invoiceItemId": 1,
+		"description": "Loyal customer",
+		"percent": 10,
+		"id": 1
+	},
+	{
+		"invoiceItemId": 2,
+		"description": "Volume",
+		"percent": 15,
+		"id": 2
+	}
+]

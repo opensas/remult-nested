@@ -1,0 +1,287 @@
+# Nested routes (nestedApi):
+#   /api/invoices/:invoicesId/items[/:id]
+#   /api/invoices/:invoicesId/items/:itemsId/discounts[/:id]
+# The segment comes from the relation name on the parent (Invoice.items), not from the table
+# (invoice_items, the many to many between invoices and products).
+# For the VS Code REST Client extension (humao.rest-client). Run them in order: each request
+# uses the ids returned by the previous ones (# @name).
+# To start from an empty db: stop the dev server and delete db/*.json
+
+@api = http://localhost:5173/api
+@json = application/json
+
+### ---------------------------------------------------------------------------
+### Product catalog (doesn't hang from anything: flat route)
+### ---------------------------------------------------------------------------
+
+# @name keyboard
+POST {{api}}/products
+Content-Type: {{json}}
+
+{ "name": "Keyboard", "price": 50 }
+
+###
+
+# @name mouse
+POST {{api}}/products
+Content-Type: {{json}}
+
+{ "name": "Mouse", "price": 20 }
+
+###
+
+# @name monitor
+POST {{api}}/products
+Content-Type: {{json}}
+
+{ "name": "Monitor", "price": 300 }
+
+### ---------------------------------------------------------------------------
+### Invoices (the second one is used to check they don't mix)
+### ---------------------------------------------------------------------------
+
+# @name invoice
+POST {{api}}/invoices
+Content-Type: {{json}}
+
+{ "customer": "Acme", "date": "2026-11-17" }
+
+###
+
+# @name otherInvoice
+POST {{api}}/invoices
+Content-Type: {{json}}
+
+{ "customer": "Globex", "date": "2026-11-17" }
+
+###
+
+@inv = {{invoice.response.body.id}}
+@other = {{otherInvoice.response.body.id}}
+
+### ---------------------------------------------------------------------------
+### Invoice items: invoiceId comes from the url
+### Without unitPrice the product's price is copied, with it that price is kept
+### ---------------------------------------------------------------------------
+
+# @name keyboardLine
+POST {{api}}/invoices/{{inv}}/items
+Content-Type: {{json}}
+
+{ "productId": {{keyboard.response.body.id}}, "quantity": 2 }
+
+###
+
+# @name mouseLine
+POST {{api}}/invoices/{{inv}}/items
+Content-Type: {{json}}
+
+{ "productId": {{mouse.response.body.id}}, "quantity": 10 }
+
+###
+
+# @name monitorLine
+POST {{api}}/invoices/{{other}}/items
+Content-Type: {{json}}
+
+{ "productId": {{monitor.response.body.id}}, "quantity": 1 }
+
+###
+
+# Special price: kept as sent, even 0
+POST {{api}}/invoices/{{other}}/items
+Content-Type: {{json}}
+
+{ "productId": {{keyboard.response.body.id}}, "quantity": 1, "unitPrice": 0 }
+
+###
+
+@kb = {{keyboardLine.response.body.id}}
+@ms = {{mouseLine.response.body.id}}
+
+### ---------------------------------------------------------------------------
+### Discounts (two levels: invoice → item → discount)
+### ---------------------------------------------------------------------------
+
+POST {{api}}/invoices/{{inv}}/items/{{kb}}/discounts
+Content-Type: {{json}}
+
+{ "description": "Loyal customer", "percent": 10 }
+
+###
+
+# @name promo
+POST {{api}}/invoices/{{inv}}/items/{{ms}}/discounts
+Content-Type: {{json}}
+
+{ "description": "November promo", "percent": 5 }
+
+### ---------------------------------------------------------------------------
+### Queries
+### ---------------------------------------------------------------------------
+
+# The invoice (flat remult route)
+GET {{api}}/invoices/{{inv}}
+
+###
+
+# The items of the invoice
+GET {{api}}/invoices/{{inv}}/items
+
+###
+
+# Filters and sorting work as on the flat route
+GET {{api}}/invoices/{{inv}}/items?quantity.gte=5&_sort=quantity&_order=desc
+
+###
+
+GET {{api}}/invoices/{{inv}}/items?__action=count
+
+###
+
+GET {{api}}/invoices/{{inv}}/items/{{ms}}
+
+###
+
+GET {{api}}/invoices/{{inv}}/items/{{ms}}/discounts
+
+### ---------------------------------------------------------------------------
+### Update and delete
+### ---------------------------------------------------------------------------
+
+PUT {{api}}/invoices/{{inv}}/items/{{kb}}
+Content-Type: {{json}}
+
+{ "quantity": 3 }
+
+###
+
+# Once set, unitPrice is independent: it only changes by hand
+PUT {{api}}/invoices/{{inv}}/items/{{kb}}
+Content-Type: {{json}}
+
+{ "unitPrice": 45 }
+
+###
+
+# Changing the product keeps the price (45, not the monitor's 300)
+PUT {{api}}/invoices/{{inv}}/items/{{kb}}
+Content-Type: {{json}}
+
+{ "productId": {{monitor.response.body.id}} }
+
+###
+
+# Changing the catalog price doesn't touch existing items either
+PUT {{api}}/products/{{mouse.response.body.id}}
+Content-Type: {{json}}
+
+{ "price": 25 }
+
+###
+
+GET {{api}}/invoices/{{inv}}/items/{{ms}}
+
+###
+
+PUT {{api}}/invoices/{{inv}}/items/{{ms}}/discounts/{{promo.response.body.id}}
+Content-Type: {{json}}
+
+{ "percent": 7.5 }
+
+###
+
+DELETE {{api}}/invoices/{{inv}}/items/{{ms}}/discounts/{{promo.response.body.id}}
+
+### ---------------------------------------------------------------------------
+### Must fail or have no effect
+### ---------------------------------------------------------------------------
+
+# Clearing the price: 400 with modelState.unitPrice
+PUT {{api}}/invoices/{{inv}}/items/{{ms}}
+Content-Type: {{json}}
+
+{ "unitPrice": null }
+
+###
+
+# Unknown product: 400 with modelState.product (Validators.relationExists)
+POST {{api}}/invoices/{{inv}}/items
+Content-Type: {{json}}
+
+{ "productId": 999, "quantity": 1 }
+
+###
+
+# An item asked for under another invoice: 404
+GET {{api}}/invoices/{{other}}/items/{{kb}}
+
+###
+
+# Discounts of an item asked for under another invoice: 404
+GET {{api}}/invoices/{{other}}/items/{{kb}}/discounts
+
+###
+
+# Unknown invoice: 404
+GET {{api}}/invoices/999/items
+
+###
+
+# invoiceId of another invoice in the body: overwritten with the one in the url
+POST {{api}}/invoices/{{inv}}/items
+Content-Type: {{json}}
+
+{ "invoiceId": {{other}}, "productId": {{mouse.response.body.id}}, "quantity": 1 }
+
+###
+
+# Trying to move an item to another invoice: quantity changes, the item stays in the url's invoice
+PUT {{api}}/invoices/{{inv}}/items/{{ms}}
+Content-Type: {{json}}
+
+{ "invoiceId": {{other}}, "quantity": 4 }
+
+###
+
+# A url filter can't widen the scope: only items of this invoice
+GET {{api}}/invoices/{{inv}}/items?invoiceId={{other}}
+
+###
+
+# Delete everything without a filter: 400 "deleteMany requires a filter"
+DELETE {{api}}/invoices/{{inv}}/items
+
+### ---------------------------------------------------------------------------
+### Flat routes of nestedOnly entities: 404, they are only reachable nested
+### ---------------------------------------------------------------------------
+
+GET {{api}}/invoice_items
+
+###
+
+POST {{api}}/invoice_items
+Content-Type: {{json}}
+
+{ "invoiceId": {{inv}}, "productId": {{keyboard.response.body.id}}, "quantity": 1 }
+
+###
+
+GET {{api}}/discounts
+
+###
+
+DELETE {{api}}/discounts/{{promo.response.body.id}}
+
+### ---------------------------------------------------------------------------
+### No cascade delete
+### ---------------------------------------------------------------------------
+
+# Delete an item: 204
+DELETE {{api}}/invoices/{{inv}}/items/{{kb}}
+
+###
+
+# Its discounts are orphans: the nested route doesn't find them anymore (404),
+# but they are still in db/discounts.json (the flat route is hidden, see above)
+GET {{api}}/invoices/{{inv}}/items/{{kb}}/discounts

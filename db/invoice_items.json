@@ -1,0 +1,23 @@
+[
+	{
+		"invoiceId": 1,
+		"productId": 1,
+		"quantity": 2,
+		"unitPrice": 50,
+		"id": 1
+	},
+	{
+		"invoiceId": 1,
+		"productId": 2,
+		"quantity": 10,
+		"unitPrice": 20,
+		"id": 2
+	},
+	{
+		"invoiceId": 2,
+		"productId": 3,
+		"quantity": 1,
+		"unitPrice": 300,
+		"id": 3
+	}
+]

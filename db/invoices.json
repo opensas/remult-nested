@@ -1,0 +1,16 @@
+[
+	{
+		"customer": "Acme",
+		"date": "2026-11-17",
+		"status": "draft",
+		"createdAt": "2026-11-17T12:02:58.879Z",
+		"id": 1
+	},
+	{
+		"customer": "Globex",
+		"date": "2026-11-17",
+		"status": "draft",
+		"createdAt": "2026-11-17T12:02:58.894Z",
+		"id": 2
+	}
+]

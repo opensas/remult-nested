@@ -1,0 +1,18 @@
+{
+	"version": "0.2",
+	"ignorePaths": ["node_modules", ".svelte-kit", "build", "db", "pnpm-lock.yaml"],
+	"words": [
+		"cuid",
+		"Globex",
+		"Honig",
+		"jycouet",
+		"nanoid",
+		"paralleldrive",
+		"prefilter",
+		"Remult",
+		"remult",
+		"sveltejs",
+		"sveltekit",
+		"upsert"
+	]
+}
